@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'appeals'
+    static_configs:
+      - targets:
+        - my-appeal-service:5002
+
+  - job_name: 'house'
+    static_configs:
+      - targets:
+        - my-house-service:5001

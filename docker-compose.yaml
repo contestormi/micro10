@@ -1,0 +1,102 @@
+version: '3'
+services:
+  appeal_service:
+    build: ./appeals
+    ports:
+      - "5002:5002"
+    restart: always
+    container_name: my-appeal-service
+    volumes:
+      - logs:/appeals/info
+    depends_on:
+      - house_service
+      - keycloak.auth
+    environment:
+      - OAUTHLIB_INSECURE_TRANSPORT=1
+
+  house_service:
+    build: ./managment
+    ports:
+      - "5001:5001"
+    restart: always
+    container_name: my-house-service
+    volumes:
+      - logs:/managment/info
+    depends_on:
+      - keycloak.auth
+    environment:
+      - OAUTHLIB_INSECURE_TRANSPORT=1
+
+  keycloak.auth:
+    image: bitnami/keycloak:latest
+    environment:
+      - DB_VENDOR=postgres
+      - DB_ADDR=postgresql
+      - DB_DATABASE=keycloak
+      - DB_USER=keycloak
+      - DB_PASSWORD=keycloak
+    ports:
+      - 8080:8080
+    depends_on:
+      - postgresql
+
+  postgresql:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=keycloak
+      - POSTGRES_DB=keycloak
+      - POSTGRES_PASSWORD=keycloak
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 5432:5432
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    depends_on:
+      - loki
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=adminpassword
+   
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+      - ./loki:/etc/loki
+    command: 
+      - --config.file=/etc/loki/loki-config.yml
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - logs:/appeals/info
+      - logs:/managment/info
+      - ./promtail:/etc/promtail
+    command: 
+      - --config.file=/etc/promtail/promtail-config.yml
+
+volumes:
+  pg_data:
+  loki-data:
+  logs:
